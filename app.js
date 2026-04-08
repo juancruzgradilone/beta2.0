@@ -3,24 +3,21 @@ import { listRecords, createRecord, updateRecord, deleteRecord, getRecord } from
 import { formatCurrency, debounce, normalize, escapeHtml } from './utils.js';
 import { printOrder, buildRemitoHtml, buildWeeklySheetHtml } from './remito.js';
 
-function normalizeCity(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
 
-  const allowed = {
-    rosario: 'Rosario',
-    roldan: 'Roldán',
-    'roldán': 'Roldán',
-    funes: 'Funes',
-    correa: 'Correa',
-    carcarana: 'Carcarañá',
-    'carcaraña': 'Carcarañá',
-    'carcarañá': 'Carcarañá',
+function normalizeCity(value) {
+  const raw = String(value ?? '').trim();
+  const allowedByNormalized = {
+    'rosario': 'Rosario',
+    'roldan': 'Roldán',
+    'funes': 'Funes',
+    'correa': 'Correa',
+    'carcarana': 'Carcarañá',
     'san jeronimo sud': 'San Jeronimo Sud',
   };
-
-  const key = normalize(raw);
-  return allowed[key] || raw;
+  const directAllowed = new Set(Object.values(allowedByNormalized));
+  if (directAllowed.has(raw)) return raw;
+  const normalized = normalize(raw);
+  return allowedByNormalized[normalized] || raw;
 }
 
 const state = {
@@ -500,7 +497,7 @@ async function handleClientSubmit(event) {
     'Nombre contacto': document.getElementById('nombreContacto').value.trim(),
     Celular: document.getElementById('celularCliente').value.trim(),
     'Dirección': document.getElementById('direccionCliente').value.trim(),
-    Ciudad: normalizeCity(document.getElementById('ciudadCliente').value),
+    Ciudad: normalizeCity(document.getElementById('ciudadCliente').value.trim()),
     'Horario atención': document.getElementById('horarioCliente').value.trim(),
     CUIL: document.getElementById('cuilCliente').value.trim(),
   };

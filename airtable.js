@@ -88,7 +88,7 @@ export async function createRecord(tableName, fields) {
   const response = await fetch(getBaseUrl(tableName), {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({ fields, typecast: true }),
   });
 
   if (!response.ok) {
@@ -103,7 +103,7 @@ export async function updateRecord(tableName, recordId, fields) {
   const response = await fetch(`${getBaseUrl(tableName)}/${recordId}`, {
     method: 'PATCH',
     headers: getHeaders(),
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({ fields, typecast: true }),
   });
 
   if (!response.ok) {
