@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Remitos Distribuidora</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Distribuidora</p>
+        <h1>Remitos</h1>
+      </div>
+      <button id="refreshAppBtn" class="ghost-btn">Actualizar</button>
+    </header>
+
+    <nav class="tabs" aria-label="Navegación principal">
+      <button class="tab-btn active" data-tab="nuevo-pedido">Nuevo pedido</button>
+      <button class="tab-btn" data-tab="pedidos">Remitos</button>
+      <button class="tab-btn" data-tab="nuevo-cliente">Agregar cliente</button>
+      <button class="tab-btn" data-tab="configuracion">Configuración</button>
+    </nav>
+
+    <main>
+      <section class="tab-panel active" id="nuevo-pedido">
+        <div class="panel-card">
+          <div class="section-title-row">
+            <div>
+              <h2>Nuevo pedido / remito</h2>
+              <p class="muted">Buscá cliente y productos sin ruido visual.</p>
+            </div>
+            <span id="orderModeBadge" class="badge">Creando</span>
+          </div>
+
+          <form id="orderForm" class="stack-lg">
+            <div class="field-group">
+              <label for="clientSearch">Cliente</label>
+              <input id="clientSearch" type="text" placeholder="Buscar por comercio o contacto" autocomplete="off" />
+              <input id="selectedClientId" type="hidden" />
+              <div id="clientSearchResults" class="search-results"></div>
+              <div id="selectedClientCard" class="selected-card hidden"></div>
+            </div>
+
+            <div class="grid-2">
+              <div class="field-group">
+                <label for="estadoPedido">Estado</label>
+                <select id="estadoPedido">
+                  <option>Pedido</option>
+                  <option>Confirmado</option>
+                  <option>Entregado</option>
+                  <option>Impago</option>
+                  <option>Modificado</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="observacionesPedido">Observaciones</label>
+                <input id="observacionesPedido" type="text" placeholder="Opcional" />
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section-title-row">
+              <div>
+                <h3>Productos</h3>
+                <p class="muted">Buscá por código, nombre o marca.</p>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="productSearch">Agregar producto</label>
+              <input id="productSearch" type="text" placeholder="Ej: V-1, merluza, McCain" autocomplete="off" />
+              <div id="productSearchResults" class="search-results"></div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Producto</th>
+                    <th>Marca</th>
+                    <th>Bultos</th>
+                    <th>P. unitario</th>
+                    <th>Subtotal</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="orderLinesBody"></tbody>
+              </table>
+            </div>
+
+            <div id="emptyLinesState" class="empty-state small">
+              Todavía no agregaste productos.
+            </div>
+
+            <div class="totals-bar">
+              <div>
+                <span class="muted">Total bultos</span>
+                <strong id="totalBoxes">0</strong>
+              </div>
+              <div>
+                <span class="muted">Total $</span>
+                <strong id="totalPrice">$ 0</strong>
+              </div>
+            </div>
+
+            <div class="actions-row">
+              <button type="button" id="resetOrderBtn" class="ghost-btn">Limpiar</button>
+              <button type="submit" id="saveOrderBtn" class="primary-btn">Guardar pedido</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="pedidos">
+        <div class="panel-card">
+          <div class="section-title-row">
+            <div>
+              <h2>Remitos</h2>
+              <p class="muted">Editá pedidos y reexportalos cuando haga falta.</p>
+            </div>
+          </div>
+
+          <div class="grid-2 grid-3-mobile">
+            <div class="field-group">
+              <label for="ordersSearch">Buscar</label>
+              <input id="ordersSearch" type="text" placeholder="Cliente, remito o estado" />
+            </div>
+            <div class="field-group">
+              <label for="ordersStatusFilter">Filtrar por estado</label>
+              <select id="ordersStatusFilter">
+                <option value="">Todos</option>
+                <option>Pedido</option>
+                <option>Confirmado</option>
+                <option>Entregado</option>
+                <option>Impago</option>
+                <option>Modificado</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-2 grid-3-mobile filters-row">
+            <div class="field-group">
+              <label for="ordersDateFrom">Desde</label>
+              <input id="ordersDateFrom" type="date" />
+            </div>
+            <div class="field-group">
+              <label for="ordersDateTo">Hasta</label>
+              <input id="ordersDateTo" type="date" />
+            </div>
+          </div>
+
+          <div class="actions-row actions-row-tight">
+            <button id="clearDateFiltersBtn" class="ghost-btn" type="button">Limpiar fechas</button>
+            <button id="printFilteredBtn" class="ghost-btn" type="button">Imprimir remitos filtrados</button>
+            <button id="weeklySheetBtn" class="ghost-btn" type="button">Planilla semanal PDF</button>
+          </div>
+
+          <div id="ordersList" class="cards-list"></div>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="nuevo-cliente">
+        <div class="panel-card">
+          <div class="section-title-row">
+            <div>
+              <h2>Agregar cliente</h2>
+              <p class="muted">Formulario simple para cargar desde el celular.</p>
+            </div>
+          </div>
+
+          <form id="clientForm" class="stack-lg">
+            <div class="grid-2">
+              <div class="field-group">
+                <label for="nombreComercio">Nombre comercio</label>
+                <input id="nombreComercio" type="text" required />
+              </div>
+              <div class="field-group">
+                <label for="nombreContacto">Nombre contacto</label>
+                <input id="nombreContacto" type="text" required />
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="field-group">
+                <label for="celularCliente">Celular</label>
+                <input id="celularCliente" type="tel" />
+              </div>
+              <div class="field-group">
+                <label for="ciudadCliente">Ciudad</label>
+                <select id="ciudadCliente" required>
+                  <option value="">Seleccionar</option>
+                  <option value="Rosario">Rosario</option>
+                  <option value="Roldán">Roldán</option>
+                  <option value="Funes">Funes</option>
+                  <option value="Correa">Correa</option>
+                  <option value="Carcarañá">Carcarañá</option>
+                  <option value="San Jeronimo Sud">San Jeronimo Sud</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="direccionCliente">Dirección</label>
+              <input id="direccionCliente" type="text" required />
+            </div>
+
+            <div class="grid-2">
+              <div class="field-group">
+                <label for="horarioCliente">Horario atención</label>
+                <input id="horarioCliente" type="text" />
+              </div>
+              <div class="field-group">
+                <label for="cuilCliente">CUIL</label>
+                <input id="cuilCliente" type="text" />
+              </div>
+            </div>
+
+            <div class="actions-row">
+              <button type="reset" class="ghost-btn">Limpiar</button>
+              <button type="submit" class="primary-btn">Guardar cliente</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="configuracion">
+        <div class="panel-card stack-lg">
+          <div>
+            <h2>Configuración</h2>
+            <p class="muted">Pegá tu token y Base ID regenerados. No dejes el token viejo.</p>
+          </div>
+
+          <div class="field-group">
+            <label for="configPat">AIRTABLE_PAT</label>
+            <input id="configPat" type="password" placeholder="pat..." />
+          </div>
+
+          <div class="field-group">
+            <label for="configBaseId">AIRTABLE_BASE_ID</label>
+            <input id="configBaseId" type="text" placeholder="app..." />
+          </div>
+
+          <div class="actions-row">
+            <button id="saveConfigBtn" class="primary-btn" type="button">Guardar configuración local</button>
+            <button id="clearConfigBtn" class="ghost-btn" type="button">Borrar configuración</button>
+          </div>
+
+          <div class="notice warning">
+            <strong>Advertencia:</strong> esta versión es un MVP sin backend. No subas un token activo al repo público.
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <section id="toast" class="toast hidden" aria-live="polite"></section>
+
+  <template id="orderCardTemplate">
+    <article class="order-card">
+      <div class="order-card-top">
+        <div>
+          <p class="order-card-id"></p>
+          <h3 class="order-card-client"></h3>
+        </div>
+        <span class="badge order-card-status"></span>
+      </div>
+      <div class="order-card-meta"></div>
+      <div class="order-card-total"></div>
+      <div class="actions-row">
+        <button class="ghost-btn edit-order-btn" type="button">Editar</button>
+        <button class="primary-btn print-order-btn" type="button">Exportar remito</button>
+        <button class="danger-btn delete-order-btn" type="button">Eliminar</button>
+      </div>
+    </article>
+  </template>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
