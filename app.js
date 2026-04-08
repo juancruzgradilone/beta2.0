@@ -3,6 +3,22 @@ import { listRecords, createRecord, updateRecord, deleteRecord, getRecord } from
 import { formatCurrency, debounce, normalize, escapeHtml } from './utils.js';
 import { printOrder, buildRemitoHtml, buildWeeklySheetHtml } from './remito.js';
 
+
+function normalizeCity(value) {
+  const raw = (value || '').trim();
+  if (!raw) return '';
+  const key = normalize(raw);
+  const cityMap = {
+    'roldan': 'Roldán',
+    'funes': 'Funes',
+    'rosario': 'Rosario',
+    'correa': 'Correa',
+    'carcarana': 'Carcarañá',
+    'san jeronimo sud': 'San Jeronimo Sud',
+  };
+  return cityMap[key] || raw;
+}
+
 const state = {
   clients: [],
   products: [],
