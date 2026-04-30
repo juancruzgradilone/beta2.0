@@ -1,24 +1,7 @@
 import { getConfig, saveConfig, clearConfig } from './config.js';
-import { listRecords, createRecord, updateRecord, deleteRecord, getRecord } from './airtable.js';
+import { listRecords, createRecord, updateRecord, deleteRecord, getRecord } from './sheets-api.js';
 import { formatCurrency, debounce, normalize, escapeHtml } from './utils.js';
 import { printOrder, buildRemitoHtml, buildWeeklySheetHtml } from './remito.js';
-
-
-function normalizeCity(value) {
-  const raw = String(value ?? '').trim();
-  const allowedByNormalized = {
-    'rosario': 'Rosario',
-    'roldan': 'Roldán',
-    'funes': 'Funes',
-    'correa': 'Correa',
-    'carcarana': 'Carcarañá',
-    'san jeronimo sud': 'San Jeronimo Sud',
-  };
-  const directAllowed = new Set(Object.values(allowedByNormalized));
-  if (directAllowed.has(raw)) return raw;
-  const normalized = normalize(raw);
-  return allowedByNormalized[normalized] || raw;
-}
 
 const state = {
   clients: [],
@@ -27,6 +10,24 @@ const state = {
   orderLines: [],
   editingOrderId: null,
 };
+
+function normalizeCity(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const key = normalize(raw);
+  const allowed = {
+    rosario: 'Rosario',
+    roldan: 'Roldán',
+    'roldán': 'Roldán',
+    funes: 'Funes',
+    correa: 'Correa',
+    carcarana: 'Carcarañá',
+    'carcaraña': 'Carcarañá',
+    'carcarañá': 'Carcarañá',
+    'san jeronimo sud': 'San Jeronimo Sud',
+  };
+  return allowed[key] || raw;
+}
 
 const els = {
   tabButtons: document.querySelectorAll('.tab-btn'),
@@ -73,7 +74,7 @@ async function init() {
   if (hasConfig()) {
     await loadInitialData();
   } else {
-    showToast('Primero guardá AIRTABLE_PAT y AIRTABLE_BASE_ID en Configuración.');
+    showToast('Primero guardá la URL del Apps Script en Configuración.');
     switchTab('configuracion');
   }
 }
@@ -103,8 +104,7 @@ function bindEvents() {
 
   els.saveConfigBtn.addEventListener('click', async () => {
     saveConfig({
-      AIRTABLE_PAT: els.configPat.value.trim(),
-      AIRTABLE_BASE_ID: els.configBaseId.value.trim(),
+      SCRIPT_URL: els.configPat.value.trim(),
     });
     showToast('Configuración guardada en este dispositivo.');
     await loadInitialData(true);
@@ -120,13 +120,14 @@ function bindEvents() {
 
 function loadConfigInputs() {
   const config = getConfig();
-  els.configPat.value = config.AIRTABLE_PAT || '';
-  els.configBaseId.value = config.AIRTABLE_BASE_ID || '';
+  els.configPat.value = config.SCRIPT_URL || '';
+  els.configBaseId.value = '';
+  els.configBaseId.closest('.field-group')?.classList.add('hidden');
 }
 
 function hasConfig() {
   const config = getConfig();
-  return Boolean(config.AIRTABLE_PAT && config.AIRTABLE_BASE_ID);
+  return Boolean(config.SCRIPT_URL);
 }
 
 async function loadInitialData(showSuccessToast = false) {
@@ -138,7 +139,7 @@ async function loadInitialData(showSuccessToast = false) {
         sort: [
           { field: 'Marca', direction: 'asc' },
           { field: 'Nombre producto', direction: 'asc' },
-          { field: 'ID', direction: 'asc' },
+          { field: 'Código', direction: 'asc' },
         ],
       }),
       listRecords('PEDIDOS', { sort: [{ field: 'Fecha creación', direction: 'desc' }] }),
@@ -317,6 +318,7 @@ function addProductLine(productId) {
       brand: product.brand,
       unitPrice: product.unitPrice,
       quantity: 1,
+      desdeStock: false,
     });
   }
 
@@ -349,11 +351,17 @@ function renderOrderLines() {
       </td>
       <td>${formatCurrency(line.unitPrice)}</td>
       <td class="line-subtotal-cell">${formatCurrency(subtotal)}</td>
+      <td class="center-cell"><input class="line-stock-input" type="checkbox" ${line.desdeStock ? "checked" : ""} /></td>
       <td><button type="button" class="danger-btn">Quitar</button></td>
     `;
 
     const qtyInput = tr.querySelector('.line-qty-input');
+    const stockInput = tr.querySelector('.line-stock-input');
     const subtotalCell = tr.querySelector('.line-subtotal-cell');
+
+    stockInput.addEventListener('change', () => {
+      state.orderLines[index].desdeStock = stockInput.checked;
+    });
 
     qtyInput.addEventListener('focus', () => {
       qtyInput.select();
@@ -453,6 +461,7 @@ async function handleOrderSubmit(event) {
           Pedido: [orderId],
           Producto: [line.productId],
           'Cantidad de cajas': Number(line.quantity),
+          'Desde stock': line.desdeStock ? 'SI' : 'NO',
         };
         if (line.lineRecordId) {
           return updateRecord('LÍNEAS DE PEDIDO', line.lineRecordId, fields);
@@ -497,7 +506,7 @@ async function handleClientSubmit(event) {
     'Nombre contacto': document.getElementById('nombreContacto').value.trim(),
     Celular: document.getElementById('celularCliente').value.trim(),
     'Dirección': document.getElementById('direccionCliente').value.trim(),
-    Ciudad: normalizeCity(document.getElementById('ciudadCliente').value.trim()),
+    Ciudad: normalizeCity(document.getElementById('ciudadCliente').value),
     'Horario atención': document.getElementById('horarioCliente').value.trim(),
     CUIL: document.getElementById('cuilCliente').value.trim(),
   };
@@ -715,6 +724,7 @@ async function loadOrderForEdit(orderId) {
         brand: product?.brand || '',
         unitPrice: Number((fields['Precio unitario'] || [product?.unitPrice || 0])[0] || product?.unitPrice || 0),
         quantity: Number(fields['Cantidad de cajas'] || 1),
+        desdeStock: String(fields['Desde stock'] || '').toUpperCase() === 'SI',
       };
     });
 
@@ -779,10 +789,10 @@ function mapProductRecord(record) {
   const fields = record.fields || {};
   return {
     id: record.id,
-    code: fields.ID || '',
+    code: fields.ID || fields['Código'] || '',
     name: fields['Nombre producto'] || '',
     brand: fields.Marca || '',
-    unitPrice: Number(fields['Precio por caja'] || 0),
+    unitPrice: Number(fields['Precio por caja'] || fields['Precio final'] || 0),
     type: fields.Tipo || '',
     xCaja: Number(fields.XCaja || 0),
     category: fields['Categoría'] || '',
