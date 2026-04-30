@@ -85,6 +85,7 @@
                     <th>Bultos</th>
                     <th>P. unitario</th>
                     <th>Subtotal</th>
+                    <th>Desde stock</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -231,17 +232,17 @@
         <div class="panel-card stack-lg">
           <div>
             <h2>Configuración</h2>
-            <p class="muted">Pegá tu token y Base ID regenerados. No dejes el token viejo.</p>
+            <p class="muted">Pegá la URL publicada del Google Apps Script que conecta la web con tu Google Sheets.</p>
           </div>
 
           <div class="field-group">
-            <label for="configPat">AIRTABLE_PAT</label>
-            <input id="configPat" type="password" placeholder="pat..." />
+            <label for="configPat">SCRIPT_URL</label>
+            <input id="configPat" type="text" placeholder="https://script.google.com/macros/s/.../exec" />
           </div>
 
           <div class="field-group">
-            <label for="configBaseId">AIRTABLE_BASE_ID</label>
-            <input id="configBaseId" type="text" placeholder="app..." />
+            <label for="configBaseId">No usar</label>
+            <input id="configBaseId" type="text" placeholder="" />
           </div>
 
           <div class="actions-row">
@@ -250,7 +251,7 @@
           </div>
 
           <div class="notice warning">
-            <strong>Advertencia:</strong> esta versión es un MVP sin backend. No subas un token activo al repo público.
+            <strong>Nota:</strong> esta versión usa Google Apps Script como backend liviano. No usa Airtable.
           </div>
         </div>
       </section>

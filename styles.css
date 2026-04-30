@@ -322,3 +322,6 @@ tr:last-child td { border-bottom: 0; }
 @media (max-width: 760px) {
   .grid-3-mobile { grid-template-columns: 1fr; }
 }
+.center-cell { text-align: center; }
+.line-stock-input { width: 20px; height: 20px; }
+.hidden { display: none !important; }

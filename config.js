@@ -1,14 +1,7 @@
-const STORAGE_KEY = 'remitos-config-v1';
+const STORAGE_KEY = 'remitos-sheets-config-v1';
 
 const defaultConfig = {
-  AIRTABLE_PAT: '',
-  AIRTABLE_BASE_ID: '',
-  TABLES: {
-    CLIENTES: 'CLIENTES',
-    PRODUCTOS: 'PRODUCTOS',
-    PEDIDOS: 'PEDIDOS',
-    LINEAS: 'LÍNEAS DE PEDIDO',
-  },
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwbyjMCUdpeWboQrb_Iot-LzeVtKHjapr7D9yclDoudKmGBS8E9hcY0TbR8UEccvoMXsw/exec',
 };
 
 export function getConfig() {
