@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'remitos-sheets-config-v1';
 
 const defaultConfig = {
-  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyRfi0PVkQvdZYhffGSzp3cEX4a439oQwnMPL2foKguXPUAiPkbb4jC6-krX4ur6Fz89g/exec',
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxyEnlMwEG-66AE8CNb-cI-KmL_JPAJwB7dq69bUTO8al4YudAg-oEf-Efkssa80ppMRw/exec',
 };
 
 export function getConfig() {
