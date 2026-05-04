@@ -873,33 +873,68 @@ function showToast(message) {
   }, 2600);
 }
 
-// ── COMPRAS (Ingreso de stock desde proveedor) ─────────────────────────────────
+// ── COMPRAS (Ingreso de stock) ────────────────────────────────────────────────
 let compraLines = [];
 
 function addCompraLine() {
-  const idx = compraLines.length;
-  compraLines.push({ productId: '', quantity: 1 });
+  compraLines.push({ productId: '', productName: '', quantity: 1 });
   renderCompraLines();
 }
 
 function renderCompraLines() {
   if (!els.compraLinesList) return;
   els.compraLinesList.innerHTML = compraLines.map((line, idx) => `
-    <div class="order-line-row" data-idx="${idx}">
-      <select class="compra-product-select" data-idx="${idx}">
-        <option value="">— Seleccionar producto —</option>
-        ${state.products.map((p) => `<option value="${p.id}" ${p.id === line.productId ? 'selected' : ''}>${p.code} · ${p.name}</option>`).join('')}
-      </select>
-      <input type="number" class="compra-qty-input" data-idx="${idx}" value="${line.quantity}" min="1" style="width:80px" />
-      <button class="ghost-btn remove-compra-line" data-idx="${idx}" type="button">✕</button>
+    <div class="order-line-row compra-line-row" data-idx="${idx}">
+      <div class="product-search-wrap" style="flex:1;position:relative">
+        <input
+          type="text"
+          class="compra-search-input"
+          data-idx="${idx}"
+          placeholder="Buscar por código o nombre..."
+          value="${escapeHtml(line.productName)}"
+          autocomplete="off"
+        />
+        <div class="compra-suggestions" data-idx="${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ccc;border-top:none;z-index:50;max-height:220px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)"></div>
+      </div>
+      <input type="number" class="compra-qty-input" data-idx="${idx}" value="${line.quantity}" min="1" style="width:72px;margin-left:8px" />
+      <button class="ghost-btn remove-compra-line" data-idx="${idx}" type="button" style="margin-left:6px">✕</button>
     </div>
   `).join('');
 
-  els.compraLinesList.querySelectorAll('.compra-product-select').forEach((sel) => {
-    sel.addEventListener('change', (e) => { compraLines[e.target.dataset.idx].productId = e.target.value; });
+  els.compraLinesList.querySelectorAll('.compra-search-input').forEach((inp) => {
+    const idx = Number(inp.dataset.idx);
+    const suggestEl = els.compraLinesList.querySelector(`.compra-suggestions[data-idx="${idx}"]`);
+
+    inp.addEventListener('input', () => {
+      const q = normalize(inp.value);
+      if (!q) { suggestEl.style.display = 'none'; return; }
+      const matches = state.products.filter((p) =>
+        normalize(p.code + ' ' + p.name).includes(q)
+      ).slice(0, 10);
+      if (!matches.length) { suggestEl.style.display = 'none'; return; }
+      suggestEl.innerHTML = matches.map((p) => `
+        <div class="compra-suggest-item" data-id="${p.id}" data-name="${escapeHtml(p.code + ' · ' + p.name)}" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #eee;font-size:13px">
+          <strong>${escapeHtml(p.code)}</strong> · ${escapeHtml(p.name)}
+        </div>
+      `).join('');
+      suggestEl.style.display = 'block';
+      suggestEl.querySelectorAll('.compra-suggest-item').forEach((item) => {
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          compraLines[idx].productId = item.dataset.id;
+          compraLines[idx].productName = item.dataset.name;
+          inp.value = item.dataset.name;
+          suggestEl.style.display = 'none';
+        });
+      });
+    });
+
+    inp.addEventListener('blur', () => setTimeout(() => { suggestEl.style.display = 'none'; }, 150));
+    inp.addEventListener('focus', () => { if (inp.value) inp.dispatchEvent(new Event('input')); });
   });
+
   els.compraLinesList.querySelectorAll('.compra-qty-input').forEach((inp) => {
-    inp.addEventListener('input', (e) => { compraLines[e.target.dataset.idx].quantity = Number(e.target.value) || 1; });
+    inp.addEventListener('input', (e) => { compraLines[Number(e.target.dataset.idx)].quantity = Number(e.target.value) || 1; });
   });
   els.compraLinesList.querySelectorAll('.remove-compra-line').forEach((btn) => {
     btn.addEventListener('click', (e) => { compraLines.splice(Number(e.target.dataset.idx), 1); renderCompraLines(); });
@@ -907,36 +942,17 @@ function renderCompraLines() {
 }
 
 async function saveCompra() {
-  const proveedor = els.compraProveedor?.value.trim();
-  const fecha = els.compraFecha?.value;
-  const obs = els.compraObservaciones?.value.trim() || '';
-
-  if (!proveedor) { showToast('Ingresá el nombre del proveedor.'); return; }
   if (!compraLines.length) { showToast('Agregá al menos un producto.'); return; }
   if (compraLines.some((l) => !l.productId)) { showToast('Seleccioná el producto en todas las líneas.'); return; }
 
   try {
     setLoading(true);
     for (const line of compraLines) {
-      await postData('createRecord', {
-        tableName: 'MOVIMIENTOS_STOCK',
-        fields: {
-          ID_PRODUCTO: line.productId,
-          Tipo: 'ENTRADA',
-          Cantidad: line.quantity,
-          Origen: 'COMPRA',
-          ID_REFERENCIA: proveedor,
-          Observaciones: obs,
-          Fecha: fecha || new Date().toISOString(),
-        },
-      });
+      await callScript('addStock', { productId: line.productId, quantity: line.quantity });
     }
-    showToast(`Ingreso registrado: ${compraLines.length} producto(s) de ${proveedor}`);
+    showToast(`Stock actualizado: ${compraLines.length} producto(s) ingresado(s).`);
     compraLines = [];
     renderCompraLines();
-    if (els.compraProveedor) els.compraProveedor.value = '';
-    if (els.compraFecha) els.compraFecha.value = '';
-    if (els.compraObservaciones) els.compraObservaciones.value = '';
   } catch (err) {
     showToast(err.message || 'No se pudo registrar el ingreso.');
   } finally {
@@ -944,7 +960,7 @@ async function saveCompra() {
   }
 }
 
-async function postData(action, payload) {
+async function callScript(action, payload) {
   const { getConfig } = await import('./config.js');
   const url = getConfig().SCRIPT_URL;
   const response = await fetch(url, {
