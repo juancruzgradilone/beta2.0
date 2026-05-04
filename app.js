@@ -455,23 +455,23 @@ async function handleOrderSubmit(event) {
       orderId = createdOrder.id;
     }
 
-    await Promise.all(
-      state.orderLines.map((line) => {
-        const fields = {
-          Pedido: [orderId],
-          Producto: [line.productId],
-          'Cantidad de cajas': Number(line.quantity),
-          'Desde stock': line.desdeStock ? 'SI' : 'NO',
-        };
-        if (line.lineRecordId) {
-          return updateRecord('LÍNEAS DE PEDIDO', line.lineRecordId, fields);
-        }
-        return createRecord('LÍNEAS DE PEDIDO', fields);
-      })
-    );
+    // Crear líneas en secuencia (no paralelo) para evitar IDs duplicados en Apps Script
+    for (const line of state.orderLines) {
+      const fields = {
+        Pedido: [orderId],
+        Producto: [line.productId],
+        'Cantidad de cajas': Number(line.quantity),
+        'Desde stock': line.desdeStock ? 'SI' : 'NO',
+      };
+      if (line.lineRecordId) {
+        await updateRecord('LÍNEAS DE PEDIDO', line.lineRecordId, fields);
+      } else {
+        await createRecord('LÍNEAS DE PEDIDO', fields);
+      }
+    }
 
     const wasEditing = Boolean(state.editingOrderId);
-    // Recarga solo pedidos (no clientes ni productos) para ser más rápido
+    // Recarga solo pedidos sin listRecords completo
     const freshOrders = await listRecords('PEDIDOS', { sort: [{ field: 'Fecha creación', direction: 'desc' }] });
     state.orders = freshOrders.map(mapOrderRecord);
     renderOrdersList();
