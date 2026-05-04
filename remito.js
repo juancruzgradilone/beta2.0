@@ -27,36 +27,37 @@ export function buildRemitoHtml(remito, items = []) {
 
   return `
   <html>
-    <head>
-      <meta charset="UTF-8"/>
-      <style>
-        body { font-family: Arial; font-size: 12px; }
-        .linea { margin-bottom: 8px; }
-        .cantidad { font-weight: bold; font-size: 13px; }
-        .producto { margin-left: 4px; }
-        .subtotal { font-weight: bold; }
-      </style>
-    </head>
     <body>
       <h2>Distribuidora Onda Crocante</h2>
       <p><strong>Remito ${remito.numero || ''}</strong></p>
       <p>Fecha: ${formatOnlyDate(remito.fecha)}</p>
-
       <hr/>
-
       ${lineas.map(l => `
-        <div class="linea">
-          <span class="cantidad">${l.cantidad}x</span>
-          <span class="producto">${l.producto}</span><br/>
+        <div>
+          <strong>${l.cantidad}x</strong> ${l.producto}<br/>
           $${l.precio} c/u<br/>
-          <span class="subtotal">Subtotal: ${formatCurrency(l.subtotal)}</span>
+          Subtotal: ${formatCurrency(l.subtotal)}
         </div>
       `).join('')}
-
       <hr/>
-
       <h3>Total: ${formatCurrency(total)}</h3>
     </body>
   </html>
+  `;
+}
+
+// ✅ FIX: función que faltaba (evita romper app.js)
+export function buildWeeklySheetHtml(rows = []) {
+  return `
+    <html>
+      <body>
+        <h2>Planilla semanal</h2>
+        ${rows.map(r => `
+          <div>
+            ${r.contactName || ''} - ${r.address || ''} - $${r.total || 0}
+          </div>
+        `).join('')}
+      </body>
+    </html>
   `;
 }
