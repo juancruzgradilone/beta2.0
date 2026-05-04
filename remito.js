@@ -7,7 +7,6 @@ function formatOnlyDate(value) {
   return new Intl.DateTimeFormat('es-AR').format(date);
 }
 
-// 🔴 FIX CRÍTICO: evita que se repitan productos
 function normalizeLineas(items) {
   return items.map(item => {
     const cantidad = Number(item.cantidad || item.Cantidad || 0);
@@ -24,7 +23,6 @@ function normalizeLineas(items) {
 
 export function buildRemitoHtml(remito, items = []) {
   const lineas = normalizeLineas(items);
-
   const total = lineas.reduce((acc, l) => acc + l.subtotal, 0);
 
   return `
@@ -40,9 +38,8 @@ export function buildRemitoHtml(remito, items = []) {
       </style>
     </head>
     <body>
-
       <h2>Distribuidora Onda Crocante</h2>
-      <p><strong>Remito ${escapeHtml(remito.numero || '')}</strong></p>
+      <p><strong>Remito ${remito.numero || ''}</strong></p>
       <p>Fecha: ${formatOnlyDate(remito.fecha)}</p>
 
       <hr/>
@@ -50,7 +47,7 @@ export function buildRemitoHtml(remito, items = []) {
       ${lineas.map(l => `
         <div class="linea">
           <span class="cantidad">${l.cantidad}x</span>
-          <span class="producto">${escapeHtml(l.producto)}</span><br/>
+          <span class="producto">${l.producto}</span><br/>
           $${l.precio} c/u<br/>
           <span class="subtotal">Subtotal: ${formatCurrency(l.subtotal)}</span>
         </div>
@@ -59,7 +56,6 @@ export function buildRemitoHtml(remito, items = []) {
       <hr/>
 
       <h3>Total: ${formatCurrency(total)}</h3>
-
     </body>
   </html>
   `;
