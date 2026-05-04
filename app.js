@@ -609,6 +609,29 @@ async function removeOrder(orderId) {
   }
 }
 
+// Obtiene las líneas de un pedido y las mapea a objetos con producto
+async function fetchOrderLines(order) {
+  const lineIds = order.lineIds || [];
+  if (!lineIds.length) return [];
+  const lineRecords = await Promise.all(lineIds.map((lineId) => getRecord('LÍNEAS DE PEDIDO', lineId).catch(() => null)));
+  return lineRecords.filter(Boolean).map((record) => {
+    const f = record.fields || {};
+    const linkedProductId = Array.isArray(f.Producto) ? f.Producto[0] : f.Producto;
+    const product = state.products.find((item) => String(item.id) === String(linkedProductId));
+    const quantity = Number(f['Cantidad de cajas'] || 0);
+    const rawPrice = Array.isArray(f['Precio unitario']) ? f['Precio unitario'][0] : f['Precio unitario'];
+    const unitPrice = Number(rawPrice || product?.unitPrice || 0);
+    return {
+      code: product?.code || linkedProductId || '-',
+      productName: product?.name || linkedProductId || '-',
+      brand: product?.brand || '-',
+      quantity,
+      unitPrice,
+      subtotal: Number(f.Subtotal || quantity * unitPrice),
+    };
+  });
+}
+
 async function printFilteredOrders() {
   const filtered = getFilteredOrders();
   if (!filtered.length) {
@@ -622,24 +645,7 @@ async function printFilteredOrders() {
 
     for (const order of filtered) {
       const client = state.clients.find((item) => item.id === order.clientId);
-      const lineRecords = await Promise.all((order.lineIds || []).map((lineId) => getRecord('LÍNEAS DE PEDIDO', lineId)));
-      const lines = lineRecords.map((record) => {
-        const f = record.fields || {};
-        const linkedProductId = Array.isArray(f.Producto) ? f.Producto[0] : f.Producto;
-        const product = state.products.find((item) => String(item.id) === String(linkedProductId));
-        const quantity = Number(f['Cantidad de cajas'] || 0);
-        const rawPrice = Array.isArray(f['Precio unitario']) ? f['Precio unitario'][0] : f['Precio unitario'];
-        const unitPrice = Number(rawPrice || product?.unitPrice || 0);
-        const subtotal = Number(f.Subtotal || quantity * unitPrice);
-        return {
-          code: product?.code || linkedProductId || '-',
-          productName: product?.name || linkedProductId || '-',
-          brand: product?.brand || '-',
-          quantity,
-          unitPrice,
-          subtotal,
-        };
-      });
+      const lines = await fetchOrderLines(order);
       documents.push(buildRemitoHtml(order, client || {}, lines, { documentTitle: `Remito ${order.remitoNumber || ''}` }));
     }
 
@@ -768,24 +774,7 @@ async function exportOrder(orderId) {
     if (!order) throw new Error('Pedido no encontrado.');
 
     const client = state.clients.find((item) => item.id === order.clientId);
-    const lineRecords = await Promise.all((order.lineIds || []).map((lineId) => getRecord('LÍNEAS DE PEDIDO', lineId)));
-    const lines = lineRecords.map((record) => {
-      const f = record.fields || {};
-      const linkedProductId = Array.isArray(f.Producto) ? f.Producto[0] : f.Producto;
-      const product = state.products.find((item) => String(item.id) === String(linkedProductId));
-      const quantity = Number(f['Cantidad de cajas'] || 0);
-      const rawPrice = Array.isArray(f['Precio unitario']) ? f['Precio unitario'][0] : f['Precio unitario'];
-      const unitPrice = Number(rawPrice || product?.unitPrice || 0);
-      const subtotal = Number(f.Subtotal || quantity * unitPrice);
-      return {
-        code: product?.code || linkedProductId || '-',
-        productName: product?.name || linkedProductId || '-',
-        brand: product?.brand || '-',
-        quantity,
-        unitPrice,
-        subtotal,
-      };
-    });
+    const lines = await fetchOrderLines(order);
 
     printOrder(order, client || {}, lines);
   } catch (error) {

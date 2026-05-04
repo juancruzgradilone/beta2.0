@@ -188,7 +188,7 @@ export function buildRemitoHtml(order, client, lines, options = {}) {
           .num { text-align: right; white-space: nowrap; }
           .code { width: 76px; }
           .brand { width: 95px; }
-          .qty { width: 64px; }
+          .qty { width: 60px; text-align: center !important; }
           .price { width: 84px; }
           .subtotal { width: 96px; }
           .totals { margin-top: 10px; margin-left: auto; width: 240px; border: 1px solid #cfcfcf; }
@@ -243,7 +243,7 @@ export function buildRemitoHtml(order, client, lines, options = {}) {
             <thead>
               <tr>
                 <th class="code">Código</th>
-                <th class="qty num">Bultos</th>
+                <th class="qty" style="text-align:center">Bultos</th>
                 <th>Producto</th>
                 <th class="brand">Marca</th>
                 <th class="price num">P. unitario</th>
@@ -254,7 +254,7 @@ export function buildRemitoHtml(order, client, lines, options = {}) {
               ${lines.map((line) => `
                 <tr>
                   <td class="code">${escapeHtml(line.code || '-')}</td>
-                  <td class="num qty"><strong style="font-size:13px">${escapeHtml(String(line.quantity || 0))}</strong></td>
+                  <td style="text-align:center;vertical-align:middle"><strong style="font-size:14px">${escapeHtml(String(line.quantity || 0))}</strong></td>
                   <td>${escapeHtml(line.productName || '-')}</td>
                   <td>${escapeHtml(line.brand || '-')}</td>
                   <td class="num">${escapeHtml(formatCurrency(line.unitPrice))}</td>
