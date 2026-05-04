@@ -471,7 +471,10 @@ async function handleOrderSubmit(event) {
     );
 
     const wasEditing = Boolean(state.editingOrderId);
-    await loadInitialData(true);
+    // Recarga solo pedidos (no clientes ni productos) para ser más rápido
+    const freshOrders = await listRecords('PEDIDOS', { sort: [{ field: 'Fecha creación', direction: 'desc' }] });
+    state.orders = freshOrders.map(mapOrderRecord);
+    renderOrdersList();
     resetOrderForm();
     switchTab('pedidos');
     showToast(wasEditing ? 'Pedido actualizado.' : 'Pedido creado.');
@@ -609,17 +612,20 @@ async function printFilteredOrders() {
       const client = state.clients.find((item) => item.id === order.clientId);
       const lineRecords = await Promise.all((order.lineIds || []).map((lineId) => getRecord('LÍNEAS DE PEDIDO', lineId)));
       const lines = lineRecords.map((record) => {
-        const linkedProductId = (record.fields.Producto || [])[0];
-        const product = state.products.find((item) => item.id === linkedProductId);
-        const quantity = Number(record.fields['Cantidad de cajas'] || 0);
-        const unitPrice = Number((record.fields['Precio unitario'] || [product?.unitPrice || 0])[0] || product?.unitPrice || 0);
+        const f = record.fields || {};
+        const linkedProductId = Array.isArray(f.Producto) ? f.Producto[0] : f.Producto;
+        const product = state.products.find((item) => String(item.id) === String(linkedProductId));
+        const quantity = Number(f['Cantidad de cajas'] || 0);
+        const rawPrice = Array.isArray(f['Precio unitario']) ? f['Precio unitario'][0] : f['Precio unitario'];
+        const unitPrice = Number(rawPrice || product?.unitPrice || 0);
+        const subtotal = Number(f.Subtotal || quantity * unitPrice);
         return {
-          code: product?.code || '-',
-          productName: product?.name || '-',
+          code: product?.code || linkedProductId || '-',
+          productName: product?.name || linkedProductId || '-',
           brand: product?.brand || '-',
           quantity,
           unitPrice,
-          subtotal: Number(record.fields.Subtotal || quantity * unitPrice),
+          subtotal,
         };
       });
       documents.push(buildRemitoHtml(order, client || {}, lines, { documentTitle: `Remito ${order.remitoNumber || ''}` }));
@@ -748,17 +754,20 @@ async function exportOrder(orderId) {
     const client = state.clients.find((item) => item.id === order.clientId);
     const lineRecords = await Promise.all((order.lineIds || []).map((lineId) => getRecord('LÍNEAS DE PEDIDO', lineId)));
     const lines = lineRecords.map((record) => {
-      const linkedProductId = (record.fields.Producto || [])[0];
-      const product = state.products.find((item) => item.id === linkedProductId);
-      const quantity = Number(record.fields['Cantidad de cajas'] || 0);
-      const unitPrice = Number((record.fields['Precio unitario'] || [product?.unitPrice || 0])[0] || product?.unitPrice || 0);
+      const f = record.fields || {};
+      const linkedProductId = Array.isArray(f.Producto) ? f.Producto[0] : f.Producto;
+      const product = state.products.find((item) => String(item.id) === String(linkedProductId));
+      const quantity = Number(f['Cantidad de cajas'] || 0);
+      const rawPrice = Array.isArray(f['Precio unitario']) ? f['Precio unitario'][0] : f['Precio unitario'];
+      const unitPrice = Number(rawPrice || product?.unitPrice || 0);
+      const subtotal = Number(f.Subtotal || quantity * unitPrice);
       return {
-        code: product?.code || '-',
-        productName: product?.name || '-',
+        code: product?.code || linkedProductId || '-',
+        productName: product?.name || linkedProductId || '-',
         brand: product?.brand || '-',
         quantity,
         unitPrice,
-        subtotal: Number(record.fields.Subtotal || quantity * unitPrice),
+        subtotal,
       };
     });
 
