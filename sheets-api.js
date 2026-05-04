@@ -47,3 +47,11 @@ export async function updateRecord(tableName, recordId, fields) {
 export async function deleteRecord(tableName, recordId) {
   return call('deleteRecord', { tableName, recordId });
 }
+
+export async function createFullOrder(fields, lines) {
+  return call('createFullOrder', { fields, lines });
+}
+
+export async function updateFullOrder(orderId, fields, lines, deleteLineIds = []) {
+  return call('updateFullOrder', { orderId, fields, lines, deleteLineIds });
+}

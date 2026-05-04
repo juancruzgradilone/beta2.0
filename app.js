@@ -1,5 +1,5 @@
 import { getConfig, saveConfig, clearConfig } from './config.js';
-import { listRecords, createRecord, updateRecord, deleteRecord, getRecord } from './sheets-api.js';
+import { listRecords, createRecord, updateRecord, deleteRecord, getRecord, createFullOrder, updateFullOrder } from './sheets-api.js';
 import { formatCurrency, debounce, normalize, escapeHtml } from './utils.js';
 import { printOrder, buildRemitoHtml, buildWeeklySheetHtml } from './remito.js';
 
@@ -436,44 +436,42 @@ async function handleOrderSubmit(event) {
   try {
     setLoading(true);
 
-    let orderId = state.editingOrderId;
     const orderFields = {
       Cliente: [els.selectedClientId.value],
       Estado: els.estadoPedido.value,
       Observaciones: els.observacionesPedido.value.trim(),
     };
 
-    if (orderId) {
-      await updateRecord('PEDIDOS', orderId, orderFields);
-      const existingLineIds = state.orderLines.map((line) => line.lineRecordId).filter(Boolean);
-      const currentOrder = await getRecord('PEDIDOS', orderId);
-      const airtableLineIds = currentOrder.fields['LÍNEAS DE PEDIDO'] || [];
-      const toDelete = airtableLineIds.filter((lineId) => !existingLineIds.includes(lineId));
-      await Promise.all(toDelete.map((lineId) => deleteRecord('LÍNEAS DE PEDIDO', lineId)));
-    } else {
-      const createdOrder = await createRecord('PEDIDOS', orderFields);
-      orderId = createdOrder.id;
-    }
+    const linePayloads = state.orderLines.map((line) => ({
+      lineRecordId: line.lineRecordId || null,
+      Producto: [line.productId],
+      'Cantidad de cajas': Number(line.quantity),
+      'Desde stock': line.desdeStock ? 'SI' : 'NO',
+    }));
 
-    // Crear líneas en secuencia (no paralelo) para evitar IDs duplicados en Apps Script
-    for (const line of state.orderLines) {
-      const fields = {
-        Pedido: [orderId],
-        Producto: [line.productId],
-        'Cantidad de cajas': Number(line.quantity),
-        'Desde stock': line.desdeStock ? 'SI' : 'NO',
-      };
-      if (line.lineRecordId) {
-        await updateRecord('LÍNEAS DE PEDIDO', line.lineRecordId, fields);
-      } else {
-        await createRecord('LÍNEAS DE PEDIDO', fields);
-      }
-    }
-
+    let newOrder;
     const wasEditing = Boolean(state.editingOrderId);
-    // Recarga solo pedidos sin listRecords completo
-    const freshOrders = await listRecords('PEDIDOS', { sort: [{ field: 'Fecha creación', direction: 'desc' }] });
-    state.orders = freshOrders.map(mapOrderRecord);
+
+    if (wasEditing) {
+      const orderId = state.editingOrderId;
+      const existingLineIds = state.orderLines.map((l) => l.lineRecordId).filter(Boolean);
+      const currentOrder = state.orders.find((o) => o.id === orderId);
+      const deleteLineIds = (currentOrder?.lineIds || []).filter((id) => !existingLineIds.includes(id));
+      const result = await updateFullOrder(orderId, orderFields, linePayloads, deleteLineIds);
+      newOrder = result.order;
+    } else {
+      const result = await createFullOrder(orderFields, linePayloads);
+      newOrder = result.order;
+    }
+
+    // Actualizar estado local sin recargar todo
+    const mappedOrder = mapOrderRecord(newOrder);
+    if (wasEditing) {
+      const idx = state.orders.findIndex((o) => o.id === mappedOrder.id);
+      if (idx >= 0) state.orders[idx] = mappedOrder;
+    } else {
+      state.orders.unshift(mappedOrder);
+    }
     renderOrdersList();
     resetOrderForm();
     switchTab('pedidos');
