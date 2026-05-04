@@ -9,53 +9,78 @@ function formatOnlyDate(value) {
 
 export function buildWeeklySheetHtml(rows, options = {}) {
   const titleRange = options.from || options.to
-    ? `Período: ${escapeHtml(options.from || 'inicio')} al ${escapeHtml(options.to || 'fin')}`
-    : 'Todos los pedidos filtrados';
+    ? `Entrega: ${escapeHtml(options.from || '')}${options.to ? ' al ' + escapeHtml(options.to) : ''}`
+    : 'Planilla de reparto';
 
+  // Agrupar por ciudad — Rosario siempre primero, resto alfabético
+  const cityOrder = (city) => {
+    const c = (city || '').toLowerCase().trim();
+    if (c === 'rosario') return '0';
+    return '1_' + c;
+  };
+  const grouped = {};
+  rows.forEach((row) => {
+    const city = row.city || 'Sin ciudad';
+    if (!grouped[city]) grouped[city] = [];
+    grouped[city].push(row);
+  });
+  const sortedCities = Object.keys(grouped).sort((a, b) => cityOrder(a).localeCompare(cityOrder(b)));
+
+  // Construir filas agrupadas con encabezado de ciudad
+  const allGroupRows = [];
+  sortedCities.forEach((city) => {
+    allGroupRows.push({ isHeader: true, city });
+    grouped[city].forEach((row) => allGroupRows.push({ isHeader: false, ...row }));
+  });
+
+  // Paginar de a 20 filas (contando headers como 1)
   const pages = [];
-  for (let i = 0; i < rows.length; i += 16) {
-    pages.push(rows.slice(i, i + 16));
+  for (let i = 0; i < allGroupRows.length; i += 20) {
+    pages.push(allGroupRows.slice(i, i + 20));
   }
+
+  const renderRow = (row) => {
+    if (row.isHeader) {
+      return `<tr class="city-header"><td colspan="6"><strong>${escapeHtml(row.city)}</strong></td></tr>`;
+    }
+    return `
+      <tr>
+        <td class="td-remito">${escapeHtml(String(row.remitoNumber || '-'))}</td>
+        <td>
+          <strong>${escapeHtml(row.tradeName || '-')}</strong>
+          ${row.contactName ? `<br><span class="weekly-meta">${escapeHtml(row.contactName)}</span>` : ''}
+        </td>
+        <td>${escapeHtml(row.address || '-')}</td>
+        <td class="num">${formatCurrency(row.total || 0)}</td>
+        <td class="td-check">☐ Ef &nbsp; ☐ Tf</td>
+        <td class="td-check">☐</td>
+      </tr>`;
+  };
 
   const pagesHtml = pages.map((pageRows, pageIndex) => `
     <section class="sheet weekly-sheet">
       <header class="weekly-header">
         <div>
-          <div class="weekly-brand">Distribuidora Onda Crocante</div>
-          <div class="weekly-title">Planilla semanal de reparto</div>
-          <div class="weekly-range">${titleRange}</div>
+          <span class="weekly-brand">Distribuidora Onda Crocante</span>
+          &nbsp;·&nbsp;
+          <span class="weekly-title">Planilla de reparto</span>
+          &nbsp;·&nbsp;
+          <span class="weekly-range">${titleRange}</span>
         </div>
-        <div class="weekly-page">Página ${pageIndex + 1} / ${pages.length}</div>
+        <div class="weekly-page">Pág. ${pageIndex + 1} / ${pages.length}</div>
       </header>
-
       <table class="weekly-table">
         <thead>
           <tr>
-            <th>Cliente</th>
-            <th>Comercio</th>
+            <th class="th-remito">Remito</th>
+            <th>Comercio / Contacto</th>
             <th>Dirección</th>
-            <th>Total</th>
-            <th class="checks">Entrega / Pago / Obs.</th>
+            <th class="th-total">Total $</th>
+            <th class="th-check">Pago</th>
+            <th class="th-check">✓</th>
           </tr>
         </thead>
-        <tbody>
-          ${pageRows.map((row) => `
-            <tr>
-              <td>${escapeHtml(row.contactName || '-')}</td>
-              <td>
-                <strong>${escapeHtml(row.tradeName || '-')}</strong><br>
-                <span class="weekly-meta">${escapeHtml(row.city || '')} · Remito ${escapeHtml(row.remitoNumber || '-')}</span>
-              </td>
-              <td>${escapeHtml(row.address || '-')}</td>
-              <td class="num">${formatCurrency(row.total || 0)}</td>
-              <td>
-                <div class="check-line">[ ] Entregado &nbsp;&nbsp; [ ] No entregado</div>
-                <div class="check-line">[ ] Efectivo &nbsp;&nbsp; [ ] Transferencia &nbsp;&nbsp; [ ] Otro</div>
-                <div class="obs-line">Obs: ____________________________________</div>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
+        <tbody>${pageRows.map(renderRow).join('')}</tbody>
       </table>
     </section>
   `).join('<div class="page-break"></div>');
@@ -66,26 +91,26 @@ export function buildWeeklySheetHtml(rows, options = {}) {
         <meta charset="UTF-8" />
         <title>Planilla semanal</title>
         <style>
-          @page { size: A4; margin: 12mm; }
+          @page { size: A4; margin: 10mm; }
           * { box-sizing: border-box; }
-          body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #111; }
-          .sheet { min-height: calc(297mm - 24mm); padding: 1mm 1mm 0; }
-          .weekly-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; border-bottom: 1px solid #222; padding-bottom: 5px; }
-          .weekly-brand { font-size: 16px; font-weight: 700; }
-          .weekly-title { font-size: 13px; font-weight: 700; margin-top: 2px; }
-          .weekly-range, .weekly-page { font-size: 10px; color: #444; }
+          body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #111; font-size: 10px; }
+          .sheet { padding: 0; }
+          .weekly-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 2px solid #111; padding-bottom: 4px; }
+          .weekly-brand { font-size: 13px; font-weight: 700; }
+          .weekly-title { font-size: 11px; font-weight: 600; }
+          .weekly-range { font-size: 10px; color: #333; }
+          .weekly-page { font-size: 9px; color: #555; white-space: nowrap; }
           .weekly-table { width: 100%; border-collapse: collapse; font-size: 10px; }
-          .weekly-table th, .weekly-table td { border: 1px solid #444; padding: 5px; vertical-align: top; }
-          .weekly-table th { background: #f3f3f3; text-align: left; }
-          .weekly-table td.num { white-space: nowrap; text-align: right; font-weight: 700; }
-          .weekly-table th:nth-child(1) { width: 16%; }
-          .weekly-table th:nth-child(2) { width: 23%; }
-          .weekly-table th:nth-child(3) { width: 22%; }
-          .weekly-table th:nth-child(4) { width: 10%; }
-          .weekly-table th:nth-child(5) { width: 29%; }
+          .weekly-table th, .weekly-table td { border: 1px solid #aaa; padding: 4px 5px; vertical-align: middle; }
+          .weekly-table th { background: #e8e8e8; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.3px; }
+          .weekly-table td.num { text-align: right; font-weight: 700; white-space: nowrap; }
+          .city-header td { background: #222 !important; color: #fff; font-size: 10px; padding: 3px 5px; border-color: #222; letter-spacing: 0.5px; }
           .weekly-meta { color: #555; font-size: 9px; }
-          .check-line { margin-bottom: 4px; white-space: nowrap; }
-          .obs-line { margin-top: 6px; white-space: nowrap; }
+          .td-remito { white-space: nowrap; font-size: 9px; color: #444; }
+          .td-check { text-align: center; font-size: 13px; letter-spacing: 2px; }
+          .th-remito { width: 7%; }
+          .th-total { width: 11%; text-align: right; }
+          .th-check { width: 9%; text-align: center; }
           .page-break { page-break-after: always; }
           @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         </style>
@@ -236,10 +261,10 @@ export function buildRemitoHtml(order, client, lines, options = {}) {
             <tbody>
               ${lines.map((line) => `
                 <tr>
-                  <td>${escapeHtml(line.code || '-')}</td>
+                  <td><strong>${escapeHtml(String(line.quantity || 0))}</strong> · ${escapeHtml(line.code || '-')}</td>
                   <td>${escapeHtml(line.productName || '-')}</td>
                   <td>${escapeHtml(line.brand || '-')}</td>
-                  <td class="num">${escapeHtml(line.quantity || 0)}</td>
+                  <td class="num"><strong>${escapeHtml(String(line.quantity || 0))}</strong></td>
                   <td class="num">${escapeHtml(formatCurrency(line.unitPrice))}</td>
                   <td class="num">${escapeHtml(formatCurrency(line.subtotal))}</td>
                 </tr>

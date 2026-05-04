@@ -20,6 +20,7 @@
       <button class="tab-btn active" data-tab="nuevo-pedido">Nuevo pedido</button>
       <button class="tab-btn" data-tab="pedidos">Remitos</button>
       <button class="tab-btn" data-tab="nuevo-cliente">Agregar cliente</button>
+      <button class="tab-btn" data-tab="compras">Compras</button>
       <button class="tab-btn" data-tab="configuracion">Configuración</button>
     </nav>
 
@@ -57,6 +58,12 @@
               <div class="field-group">
                 <label for="observacionesPedido">Observaciones</label>
                 <input id="observacionesPedido" type="text" placeholder="Opcional" />
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="field-group">
+                <label for="fechaEntregaPedido">Fecha de entrega</label>
+                <input id="fechaEntregaPedido" type="date" />
               </div>
             </div>
 
@@ -145,11 +152,11 @@
 
           <div class="grid-2 grid-3-mobile filters-row">
             <div class="field-group">
-              <label for="ordersDateFrom">Desde</label>
+              <label for="ordersDateFrom">Entrega desde</label>
               <input id="ordersDateFrom" type="date" />
             </div>
             <div class="field-group">
-              <label for="ordersDateTo">Hasta</label>
+              <label for="ordersDateTo">Entrega hasta</label>
               <input id="ordersDateTo" type="date" />
             </div>
           </div>
@@ -225,6 +232,38 @@
               <button type="submit" class="primary-btn">Guardar cliente</button>
             </div>
           </form>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="compras">
+        <div class="section-header">
+          <h2>Ingreso de stock (Compras a proveedor)</h2>
+        </div>
+        <div class="card form-card">
+          <div class="grid-2">
+            <div class="field-group">
+              <label for="compraProveedor">Proveedor</label>
+              <input id="compraProveedor" type="text" placeholder="Nombre del proveedor" />
+            </div>
+            <div class="field-group">
+              <label for="compraFecha">Fecha</label>
+              <input id="compraFecha" type="date" />
+            </div>
+          </div>
+          <div class="field-group">
+            <label for="compraObservaciones">Observaciones</label>
+            <input id="compraObservaciones" type="text" placeholder="Opcional" />
+          </div>
+          <div class="divider"></div>
+          <div class="section-title-row">
+            <span class="section-title">Productos ingresados</span>
+            <button id="addCompraLineBtn" class="ghost-btn" type="button">+ Agregar producto</button>
+          </div>
+          <div id="compraLinesList" class="order-lines-list"></div>
+          <div class="divider"></div>
+          <div class="form-actions">
+            <button id="saveCompraBtn" class="primary-btn" type="button">Registrar ingreso de stock</button>
+          </div>
         </div>
       </section>
 

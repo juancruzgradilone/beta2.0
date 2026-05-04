@@ -59,6 +59,13 @@ const els = {
   clearDateFiltersBtn: document.getElementById('clearDateFiltersBtn'),
   printFilteredBtn: document.getElementById('printFilteredBtn'),
   weeklySheetBtn: document.getElementById('weeklySheetBtn'),
+  fechaEntregaPedido: document.getElementById('fechaEntregaPedido'),
+  compraProveedor: document.getElementById('compraProveedor'),
+  compraFecha: document.getElementById('compraFecha'),
+  compraObservaciones: document.getElementById('compraObservaciones'),
+  compraLinesList: document.getElementById('compraLinesList'),
+  addCompraLineBtn: document.getElementById('addCompraLineBtn'),
+  saveCompraBtn: document.getElementById('saveCompraBtn'),
   configPat: document.getElementById('configPat'),
   configBaseId: document.getElementById('configBaseId'),
   saveConfigBtn: document.getElementById('saveConfigBtn'),
@@ -101,6 +108,10 @@ function bindEvents() {
   els.clearDateFiltersBtn.addEventListener('click', () => { els.ordersDateFrom.value = ''; els.ordersDateTo.value = ''; renderOrdersList(); });
   els.printFilteredBtn.addEventListener('click', printFilteredOrders);
   els.weeklySheetBtn.addEventListener('click', printWeeklySheet);
+  if (els.addCompraLineBtn) els.addCompraLineBtn.addEventListener('click', addCompraLine);
+  if (els.saveCompraBtn) els.saveCompraBtn.addEventListener('click', saveCompra);
+  // Fecha entrega por defecto: próximo miércoles
+  if (els.fechaEntregaPedido) els.fechaEntregaPedido.value = nextWednesday();
 
   els.saveConfigBtn.addEventListener('click', async () => {
     saveConfig({
@@ -440,6 +451,7 @@ async function handleOrderSubmit(event) {
       Cliente: [els.selectedClientId.value],
       Estado: els.estadoPedido.value,
       Observaciones: els.observacionesPedido.value.trim(),
+      'Fecha entrega': els.fechaEntregaPedido?.value || '',
     };
 
     const linePayloads = state.orderLines.map((line) => ({
@@ -486,6 +498,7 @@ async function handleOrderSubmit(event) {
 
 function resetOrderForm() {
   state.editingOrderId = null;
+  if (els.fechaEntregaPedido) els.fechaEntregaPedido.value = nextWednesday();
   state.orderLines = [];
   els.selectedClientId.value = '';
   els.clientSearch.value = '';
@@ -538,9 +551,10 @@ function getFilteredOrders() {
     const clientName = client ? `${client.tradeName} ${client.contactName}` : '';
     const matchesQuery = !query || normalize(`${order.remitoNumber} ${order.status} ${clientName}`).includes(query);
     const matchesStatus = !status || order.status === status;
-    const created = order.createdAtRaw ? new Date(order.createdAtRaw) : null;
-    const matchesFrom = !from || (created && created >= from);
-    const matchesTo = !to || (created && created <= to);
+    // Filtrar por fecha de ENTREGA (si tiene), si no por fecha creación
+    const dateToFilter = order.deliveryDate ? new Date(order.deliveryDate) : (order.createdAtRaw ? new Date(order.createdAtRaw) : null);
+    const matchesFrom = !from || (dateToFilter && dateToFilter >= from);
+    const matchesTo = !to || (dateToFilter && dateToFilter <= to);
     return matchesQuery && matchesStatus && matchesFrom && matchesTo;
   });
 }
@@ -664,8 +678,9 @@ async function printWeeklySheet() {
     const rows = filtered
       .map((order) => {
         const client = state.clients.find((item) => item.id === order.clientId);
+        const city = client?.city || '';
         return {
-          city: client?.city || '',
+          city,
           tradeName: client?.tradeName || 'Cliente sin nombre',
           contactName: client?.contactName || '',
           address: client?.address || '-',
@@ -674,7 +689,10 @@ async function printWeeklySheet() {
         };
       })
       .sort((a, b) => {
-        const cityCompare = (a.city || '').localeCompare(b.city || '', 'es', { sensitivity: 'base' });
+        // Rosario siempre primero
+        const aKey = (a.city || '').toLowerCase().trim() === 'rosario' ? '0' : '1_' + (a.city || '').toLowerCase();
+        const bKey = (b.city || '').toLowerCase().trim() === 'rosario' ? '0' : '1_' + (b.city || '').toLowerCase();
+        const cityCompare = aKey.localeCompare(bKey, 'es', { sensitivity: 'base' });
         if (cityCompare !== 0) return cityCompare;
         return (a.tradeName || '').localeCompare(b.tradeName || '', 'es', { sensitivity: 'base' });
       });
@@ -806,6 +824,15 @@ function mapProductRecord(record) {
   };
 }
 
+function nextWednesday() {
+  const today = new Date();
+  const day = today.getDay(); // 0=dom,1=lun,...,3=mie
+  const daysUntilWed = day <= 3 ? (3 - day) || 7 : 10 - day;
+  const wed = new Date(today);
+  wed.setDate(today.getDate() + daysUntilWed);
+  return wed.toISOString().slice(0, 10);
+}
+
 function mapOrderRecord(record) {
   const fields = record.fields || {};
   return {
@@ -814,6 +841,8 @@ function mapOrderRecord(record) {
     clientId: (fields.Cliente || [])[0] || '',
     createdAt: formatDate(fields['Fecha creación']),
     createdAtRaw: fields['Fecha creación'] || '',
+    deliveryDate: fields['Fecha entrega'] || '',
+    deliveryDateFormatted: fields['Fecha entrega'] ? formatDate(fields['Fecha entrega']) : '',
     status: fields.Estado || '',
     total: Number(fields.Total || 0),
     observations: fields.Observaciones || '',
@@ -842,4 +871,88 @@ function showToast(message) {
   showToast.timer = setTimeout(() => {
     els.toast.classList.add('hidden');
   }, 2600);
+}
+
+// ── COMPRAS (Ingreso de stock desde proveedor) ─────────────────────────────────
+let compraLines = [];
+
+function addCompraLine() {
+  const idx = compraLines.length;
+  compraLines.push({ productId: '', quantity: 1 });
+  renderCompraLines();
+}
+
+function renderCompraLines() {
+  if (!els.compraLinesList) return;
+  els.compraLinesList.innerHTML = compraLines.map((line, idx) => `
+    <div class="order-line-row" data-idx="${idx}">
+      <select class="compra-product-select" data-idx="${idx}">
+        <option value="">— Seleccionar producto —</option>
+        ${state.products.map((p) => `<option value="${p.id}" ${p.id === line.productId ? 'selected' : ''}>${p.code} · ${p.name}</option>`).join('')}
+      </select>
+      <input type="number" class="compra-qty-input" data-idx="${idx}" value="${line.quantity}" min="1" style="width:80px" />
+      <button class="ghost-btn remove-compra-line" data-idx="${idx}" type="button">✕</button>
+    </div>
+  `).join('');
+
+  els.compraLinesList.querySelectorAll('.compra-product-select').forEach((sel) => {
+    sel.addEventListener('change', (e) => { compraLines[e.target.dataset.idx].productId = e.target.value; });
+  });
+  els.compraLinesList.querySelectorAll('.compra-qty-input').forEach((inp) => {
+    inp.addEventListener('input', (e) => { compraLines[e.target.dataset.idx].quantity = Number(e.target.value) || 1; });
+  });
+  els.compraLinesList.querySelectorAll('.remove-compra-line').forEach((btn) => {
+    btn.addEventListener('click', (e) => { compraLines.splice(Number(e.target.dataset.idx), 1); renderCompraLines(); });
+  });
+}
+
+async function saveCompra() {
+  const proveedor = els.compraProveedor?.value.trim();
+  const fecha = els.compraFecha?.value;
+  const obs = els.compraObservaciones?.value.trim() || '';
+
+  if (!proveedor) { showToast('Ingresá el nombre del proveedor.'); return; }
+  if (!compraLines.length) { showToast('Agregá al menos un producto.'); return; }
+  if (compraLines.some((l) => !l.productId)) { showToast('Seleccioná el producto en todas las líneas.'); return; }
+
+  try {
+    setLoading(true);
+    for (const line of compraLines) {
+      await postData('createRecord', {
+        tableName: 'MOVIMIENTOS_STOCK',
+        fields: {
+          ID_PRODUCTO: line.productId,
+          Tipo: 'ENTRADA',
+          Cantidad: line.quantity,
+          Origen: 'COMPRA',
+          ID_REFERENCIA: proveedor,
+          Observaciones: obs,
+          Fecha: fecha || new Date().toISOString(),
+        },
+      });
+    }
+    showToast(`Ingreso registrado: ${compraLines.length} producto(s) de ${proveedor}`);
+    compraLines = [];
+    renderCompraLines();
+    if (els.compraProveedor) els.compraProveedor.value = '';
+    if (els.compraFecha) els.compraFecha.value = '';
+    if (els.compraObservaciones) els.compraObservaciones.value = '';
+  } catch (err) {
+    showToast(err.message || 'No se pudo registrar el ingreso.');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function postData(action, payload) {
+  const { getConfig } = await import('./config.js');
+  const url = getConfig().SCRIPT_URL;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.error || 'Error del servidor');
+  return data.result;
 }
